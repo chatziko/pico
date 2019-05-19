@@ -4,12 +4,10 @@ clean:
 	@rm -rf *.o
 	@rm -rf server
 
-server: main.o httpd.o
-	gcc -o server $^
+server: main.o httpd.o base64.o
+	gcc -o server $^ -lcrypto
 
-main.o: main.c httpd.h
-	gcc -c -o main.o main.c
-
+main.o: main.c httpd.h base64.h
 httpd.o: httpd.c httpd.h
-	gcc -c -o httpd.o httpd.c
+base64.o: base64.c base64.h
 
