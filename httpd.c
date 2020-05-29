@@ -152,7 +152,7 @@ void respond(int n) {
     header_t *h = reqhdr;
     char *t, *t2;
     while (h < reqhdr + 16) {
-      char *k, *v, *t;
+      char *k, *v;
 
       k = strtok(NULL, "\r\n: \t");
       if (!k)
@@ -170,7 +170,7 @@ void respond(int n) {
       if (t[1] == '\r' && t[2] == '\n')
         break;
     }
-    t++; // now the *t shall be the beginning of user payload
+    t += 3; // now the *t shall be the beginning of user payload, after \r\n
     t2 = request_header("Content-Length"); // and the related header if there is
     payload = t;
     payload_size = t2 ? atol(t2) : (rcvd - (t - buf));
