@@ -179,6 +179,7 @@ void respond(int n) {
     clientfd = clients[n];
     dup2(clientfd, STDOUT_FILENO);
     close(clientfd);
+    setvbuf(stdout, NULL, _IONBF, 0);   // no buffering for fast response
 
     // call router
     route();
