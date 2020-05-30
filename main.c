@@ -1,18 +1,20 @@
 #include "httpd.h"
 #include "base64.h"
 #include "assert.h"
+#include "stdlib.h"
 #include <openssl/md5.h>
 
-typedef char User[100];  // User format: <username>:<password-md5>
-User users[100];         // contents of /etc/htpasswd, max 100 entries
+typedef char Line[100];  // use lines of 100 chars max
+Line htpasswd[100];      // contents of /etc/htpasswd, max 100 entries, format is <username>:<password-md5>
 
-void read_users();
+void read_file(char* filename, Line lines[], int max_lines);
 void send_file(char*);
-int check_auth(User[], char*);
+int check_auth(Line[], char*);
+char* post_param(char* param_name );
 
 
 int main(int c, char **v) {
-  read_users();
+  read_file("/etc/htpasswd", htpasswd, 100);
   serve_forever("8000");
   return 0;
 }
@@ -26,7 +28,7 @@ void route() {
 
   if(h->name) {
     // Authorization header found, check it
-    if(!check_auth(users, h->value))
+    if(!check_auth(htpasswd, h->value))
       return;
 
   } else {
@@ -43,6 +45,24 @@ void route() {
   ROUTE_GET("/") {
     printf("HTTP/1.1 200 OK\r\n\r\n");
     send_file("/var/www/pico/index.html");
+  }
+
+  ROUTE_POST("/ultimate.html") {
+    // An extra layer of protection: require an admin password in POST
+    Line admin_pwd[1];
+    read_file("/etc/admin_pwd", admin_pwd, 1);
+
+    char* given_pwd = post_param("admin_pwd");
+    int allowed = given_pwd != NULL && strcmp(admin_pwd[0], given_pwd) == 0;
+    free(given_pwd);
+
+    if (!allowed) {
+      printf("HTTP/1.1 403 Forbidden\r\n\r\nForbidden");
+      return;
+    }
+
+    printf("HTTP/1.1 200 OK\r\n\r\n");
+    send_file("/var/www/pico/ultimate.html");
   }
 
   ROUTE_GET("/test") {
@@ -66,17 +86,15 @@ void route() {
   ROUTE_END()
 }
 
-void read_users() {
-  // read users from /etc/htpasswd
-  // the file's format is: <username>:<password-md5>
-  //
-  FILE *file = fopen("/etc/htpasswd", "r");
+// Read at most max_lines lines from filename and store in lines[] array
+void read_file(char* filename, Line lines[], int max_lines) {
+  FILE *file = fopen(filename, "r");
   assert(file);
 
   int i;
-  for(i = 0; i < sizeof(users) && fgets(users[i], sizeof(User), file); i++)
-    users[i][strlen(users[i])-1] = '\0'; // strip newline
-  users[i][0] = '\0'; // finish with empty string
+  for(i = 0; i < max_lines && fgets(lines[i], sizeof(Line), file); i++)
+    lines[i][strlen(lines[i])-1] = '\0'; // strip newline
+  lines[i][0] = '\0'; // finish with empty string
   fclose(file);
 }
 
@@ -88,7 +106,7 @@ void md5_hex(char *str, char *md5) {
     sprintf(md5 + 2*i, "%02x", md5_bin[i]);
 }
 
-int check_auth(User users[], char *auth_header) {
+int check_auth(Line users[], char *auth_header) {
   // auth_header contains "Basic <Base64>", extract <Base64> string and decode in auth_username
   char auth_username[100];
   Base64DecodeStr(auth_header+6, auth_username, 100); // +6 to skip "Basic "
@@ -140,4 +158,36 @@ void send_file(char *filename) {
   while((buflen = fread(buf, 1, 1024, file)) > 0)
     fwrite(buf, 1, buflen, stdout);
   fclose(file);
+}
+
+// Parses and returns (in new memory) the value of a POST param
+char* post_param(char* param_name) {
+  // These are provided by pico:
+  //  payload      : points to the POST data
+  //  payload_size : the size of the paylaod
+
+  // The POST data are in the form name1=value1&name2=value2&...
+  // We need NULL terminated strings, so change '&' and '=' to '\0'
+  // (copy first to avoid changing the real payload).
+
+  char post_data[100];
+  memcpy(post_data, payload, payload_size+1);
+
+  for (int i = 0; i < payload_size; i++)
+    if (post_data[i] == '&' || post_data[i] == '=')
+      post_data[i] = '\0';
+
+  // Now loop over all name=value pairs
+  char* value;
+  for (
+    char* name = post_data;
+    name < &post_data[payload_size];
+    name = &value[strlen(value) + 1]      // the next name is right after the value
+  ) {
+    value = &name[strlen(name) + 1];      // the value is right after the name
+    if (strcmp(name, param_name) == 0)
+      return strdup(value);
+  }
+
+  return NULL;   // not found
 }
