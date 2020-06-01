@@ -8,9 +8,10 @@ typedef char Line[100];  // use lines of 100 chars max
 Line htpasswd[100];      // contents of /etc/htpasswd, max 100 entries, format is <username>:<password-md5>
 
 void read_file(char* filename, Line lines[], int max_lines);
-void send_file(char*);
 int check_auth(Line[], char*);
 char* post_param(char* param_name );
+void serve_index();
+void serve_ultimate();
 
 
 int main(int c, char **v) {
@@ -43,8 +44,7 @@ void route() {
   ROUTE_START()
 
   ROUTE_GET("/") {
-    printf("HTTP/1.1 200 OK\r\n\r\n");
-    send_file("/var/www/pico/index.html");
+    serve_index();
   }
 
   ROUTE_POST("/ultimate.html") {
@@ -54,15 +54,13 @@ void route() {
 
     char* given_pwd = post_param("admin_pwd");
     int allowed = given_pwd != NULL && strcmp(admin_pwd[0], given_pwd) == 0;
-    free(given_pwd);
 
-    if (!allowed) {
+    if (allowed)
+      serve_ultimate();
+    else
       printf("HTTP/1.1 403 Forbidden\r\n\r\nForbidden");
-      return;
-    }
 
-    printf("HTTP/1.1 200 OK\r\n\r\n");
-    send_file("/var/www/pico/ultimate.html");
+    free(given_pwd);
   }
 
   ROUTE_GET("/test") {
@@ -107,12 +105,14 @@ void md5_hex(char *str, char *md5) {
 }
 
 int check_auth(Line users[], char *auth_header) {
-  // auth_header contains "Basic <Base64>", extract <Base64> string and decode in auth_username
-  char auth_username[100];
-  Base64DecodeStr(auth_header+6, auth_username, 100); // +6 to skip "Basic "
+  // auth_header contains "Basic <Base64>", extract <Base64> string and decode in auth_decoded
+  unsigned char *auth_decoded;
+  int length;
+  Base64Decode(auth_header+6, &auth_decoded, &length); // +6 to skip "Basic "
   
-  // auth_username is of the form "<username>:<password>", separate them
-  char *colon = strchr(auth_username, ':');   // find ':'
+  // auth_decoded is of the form "<username>:<password>", separate them
+  char *auth_username = auth_decoded;         // username is at the start
+  char *colon = strchr(auth_decoded, ':');    // find ':'
   if(colon != NULL)
     *colon = '\0';                            // change to \0 to split the string in two
   char *auth_password = colon ? colon+1 : ""; // password starts after the colon
@@ -134,6 +134,8 @@ int check_auth(Line users[], char *auth_header) {
     printf("Invalid user: ");
     printf(auth_username);
     printf("\"\r\n\r\n");
+
+    free(auth_decoded);
     return 0;
   }
 
@@ -145,9 +147,12 @@ int check_auth(Line users[], char *auth_header) {
     printf("WWW-Authenticate: Basic realm=\"");
     printf("Invalid password");
     printf("\"\r\n\r\n");
+
+    free(auth_decoded);
     return 0;
   }
 
+  free(auth_decoded);
   return 1; // both ok
 }
 
@@ -190,4 +195,14 @@ char* post_param(char* param_name) {
   }
 
   return NULL;   // not found
+}
+
+void serve_index() {
+    printf("HTTP/1.1 200 OK\r\n\r\n");
+    send_file("/var/www/pico/index.html");
+}
+
+void serve_ultimate() {
+  printf("HTTP/1.1 200 OK\r\n\r\n");
+  send_file("/var/www/pico/ultimate.html");
 }
