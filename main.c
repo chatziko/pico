@@ -175,12 +175,12 @@ char* post_param(char* param_name) {
   // We need NULL terminated strings, so change '&' and '=' to '\0'
   // (copy first to avoid changing the real payload).
 
-  char post_data[100];
-  memcpy(post_data, payload, payload_size+1);
+  char post_data[payload_size+1];     // dynamic size, to ensure it's big enough
+  strcpy(post_data, payload);
 
-  for (int i = 0; i < payload_size; i++)
-    if (post_data[i] == '&' || post_data[i] == '=')
-      post_data[i] = '\0';
+  for (char* c = post_data; *c != '\0'; c++)
+    if (*c == '&' || *c == '=')
+      *c = '\0';
 
   // Now loop over all name=value pairs
   char* value;
