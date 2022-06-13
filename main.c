@@ -11,7 +11,6 @@ void read_file(char* filename, Line lines[], int max_lines);
 int check_auth(Line[], char*);
 char* post_param(char* param_name );
 void serve_index();
-void serve_ultimate();
 
 
 int main(int c, char **v) {
@@ -46,21 +45,20 @@ void route() {
   ROUTE_GET("/") {
     serve_index();
   }
+  
+  ROUTE_POST("/check_secret.html") {
+    char* secret = post_param("secret");
 
-  ROUTE_POST("/ultimate.html") {
-    // An extra layer of protection: require an admin password in POST
-    Line admin_pwd[1];
-    read_file("/etc/admin_pwd", admin_pwd, 1);
+    // Convert hex to binary and write to file
+    FILE* f = fopen("/tmp/cipher", "w");
+    for(char* s = secret; s[0] && s[1]; s += 2) {
+      int byte;
+      sscanf(s, "%2x", &byte);
+      fprintf(f, "%c", byte);
+    }
+    fclose(f);
 
-    char* given_pwd = post_param("admin_pwd");
-    int allowed = given_pwd != NULL && strcmp(admin_pwd[0], given_pwd) == 0;
-
-    if (allowed)
-      serve_ultimate();
-    else
-      printf("HTTP/1.1 403 Forbidden\r\n\r\nForbidden");
-
-    free(given_pwd);
+    system("cd check-secret && ./check-secret < /tmp/cipher");
   }
 
   ROUTE_GET("/test") {
@@ -200,9 +198,4 @@ char* post_param(char* param_name) {
 void serve_index() {
     printf("HTTP/1.1 200 OK\r\n\r\n");
     send_file("/var/www/pico/index.html");
-}
-
-void serve_ultimate() {
-  printf("HTTP/1.1 200 OK\r\n\r\n");
-  send_file("/var/www/pico/ultimate.html");
 }
