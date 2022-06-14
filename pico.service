@@ -16,6 +16,7 @@ User=www-data
 LimitNOFILE=100000
 
 ExecStart=/usr/local/pico/server
+WorkingDirectory=/usr/local/pico
 
 [Install]
 WantedBy=multi-user.target
