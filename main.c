@@ -16,8 +16,10 @@ void serve_index();
 
 
 int main(int c, char **v) {
-  read_file("/etc/pico/htpasswd", htpasswd, 100);
-  read_file("/etc/pico/key", &encryption_key, 1);
+  // default accout: test/test (encrypted: 029794db6e76cb559613732d7c94b24b360bb6f05879bb99e7765518b55abc57)
+  read_file("./config/htpasswd", htpasswd, 100);
+  read_file("./config/key", &encryption_key, 1);
+
   serve_forever("8000");
   return 0;
 }
@@ -199,5 +201,5 @@ char* post_param(char* param_name) {
 
 void serve_index() {
     printf("HTTP/1.1 200 OK\r\n\r\n");
-    send_file("/var/www/pico/index.html");
+    send_file("./www-root/index.html");
 }
