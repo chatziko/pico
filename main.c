@@ -1,10 +1,12 @@
 #include "httpd.h"
 #include "base64.h"
+#include "encryption/encryption.h"
 #include "assert.h"
 #include "stdlib.h"
 #include <openssl/md5.h>
 
 typedef char Line[100];  // use lines of 100 chars max
+Line encryption_key;
 Line htpasswd[100];      // contents of /etc/htpasswd, max 100 entries, format is <username>:<password-md5>
 
 void read_file(char* filename, Line lines[], int max_lines);
@@ -14,7 +16,8 @@ void serve_index();
 
 
 int main(int c, char **v) {
-  read_file("/etc/htpasswd", htpasswd, 100);
+  read_file("/etc/pico/htpasswd", htpasswd, 100);
+  read_file("/etc/pico/key", &encryption_key, 1);
   serve_forever("8000");
   return 0;
 }
@@ -46,21 +49,6 @@ void route() {
     serve_index();
   }
   
-  ROUTE_POST("/check_secret.html") {
-    char* secret = post_param("secret");
-
-    // Convert hex to binary and write to file
-    FILE* f = fopen("/tmp/cipher", "w");
-    for(char* s = secret; s[0] && s[1]; s += 2) {
-      int byte;
-      sscanf(s, "%2x", &byte);
-      fprintf(f, "%c", byte);
-    }
-    fclose(f);
-
-    system("cd check-secret && ./check-secret < /tmp/cipher");
-  }
-
   ROUTE_GET("/test") {
     printf("HTTP/1.1 200 OK\r\n\r\n");
     printf("List of request headers:\r\n\r\n");
@@ -113,7 +101,7 @@ int check_auth(Line users[], char *auth_header) {
   char *colon = strchr(auth_decoded, ':');    // find ':'
   if(colon != NULL)
     *colon = '\0';                            // change to \0 to split the string in two
-  char *auth_password = colon ? colon+1 : ""; // password starts after the colon
+  char *auth_password_enc = colon ? colon+1 : ""; // password starts after the colon
 
   // find auth_username in users (each line is <user>:<md5>)
   char *password_md5 = NULL;
@@ -137,9 +125,23 @@ int check_auth(Line users[], char *auth_header) {
     return 0;
   }
 
+  // since we run over http, the user should provide the password encrypted.
+  // we decrypted here
+  fprintf(stderr, "encrypted: %s\n", auth_password_enc);
+  char *auth_password = decrypt(encryption_key, auth_password_enc);
+  fprintf(stderr, "decrypted: %s\n", auth_password);
+  if (!auth_password) {
+    printf("HTTP/1.1 500 Internal Server Error\r\n");
+
+    free(auth_password);
+    return 0;
+  }
+
   // check password's md5
   char auth_password_md5[33];
   md5_hex(auth_password, auth_password_md5);
+  free(auth_password);
+
   if(strcmp(password_md5, auth_password_md5) != 0) {
     printf("HTTP/1.1 401 Unauthorized\r\n");
     printf("WWW-Authenticate: Basic realm=\"");

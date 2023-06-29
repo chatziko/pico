@@ -11,10 +11,11 @@ clean:
 	@rm -rf *.o
 	@rm -rf server
 
-server: main.o httpd.o base64.o
+server: main.o httpd.o base64.o encryption/encryption.o encryption/aes.o
 	gcc $(LDFLAGS) -o server $^ -lcrypto
 
-main.o: main.c httpd.h base64.h
+main.o: main.c encryption/encryption.c encryption/aes.c encryption/encryption.h httpd.h base64.h
 httpd.o: httpd.c httpd.h
+encryption/encryption.o: encryption/encryption.c encryption/encryption.h
 base64.o: base64.c base64.h
 
