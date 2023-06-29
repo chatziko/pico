@@ -85,7 +85,6 @@ char* encrypt(char* key, char* msg) {
 	msg_size += padding_size;
 
 	uint8_t* res_bin = malloc(msg_size);
-	printf("gaga\n");
 
 	// first the IV
 	for(int i = 0; i < AES_BLOCKLEN; i++)
@@ -104,7 +103,6 @@ char* encrypt(char* key, char* msg) {
 	AES_CBC_encrypt_buffer(&ctx, &res_bin[AES_BLOCKLEN], msg_size);
 
 	// to hex
-	printf("aa: %d\n",  msg_size);
 	char* res = malloc(msg_size * 2 + 1);
 	res[msg_size*2] = '\0';
 	for(int i = 0; i < msg_size; i++)

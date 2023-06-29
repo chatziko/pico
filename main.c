@@ -133,7 +133,6 @@ int check_auth(Line users[], char *auth_header) {
 
   // since we run over http, the user should provide the password encrypted.
   // we decrypted here
-  fprintf(stderr, "encrypted: %s\n", auth_password_enc);
   char *auth_password = decrypt(encryption_key, auth_password_enc);
   fprintf(stderr, "decrypted: %s\n", auth_password);
   if (!auth_password) {
