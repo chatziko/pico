@@ -67,6 +67,10 @@ void route() {
     printf("HTTP/1.1 200 OK\r\n\r\n");
     printf("Wow, seems that you POSTed %d bytes. \r\n", payload_size);
     printf("Fetch the data using `payload` variable.");
+
+    char* test = post_param("test");
+    if(test)
+      printf("Test param: %s\n", test);
   }
 
   ROUTE_END()
